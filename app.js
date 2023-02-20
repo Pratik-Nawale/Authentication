@@ -2,6 +2,7 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
 const mongoose = require("mongoose");
+const encrypt = require("mongoose-encryption");
 const port = 8000;
 
 const app = express();
@@ -27,10 +28,14 @@ db.once("open", function(){
 });
 
 
-const userSchema = {
+const userSchema = new mongoose.Schema ({
     email: String,
     password: String
-};
+});
+
+// store it in environment variable
+const secret = "Thisisourlittlesecret.";
+userSchema.plugin(encrypt, { secret: secret, encryptedFields: ['password'] });
 
 const User = new mongoose.model("User", userSchema);
 
@@ -49,11 +54,13 @@ app.get("/register", (req, res) => {
 })
 
 app.post("/register", (req, res) => {
+
     const newUser = new User({
         email: req.body.username,
         password: req.body.password
     });
 
+    
     newUser.save((err) => {
         if(err){
             console.log(err);
