@@ -48,30 +48,31 @@ db.once("open", function () {
 const userSchema = new mongoose.Schema({
   email: String,
   password: String,
-  googleId: String
+  googleId: String,
+  secret: String
 });
 
 userSchema.plugin(passportLocalMongoose);
 userSchema.plugin(findOrCreate);
 
-const User = new mongoose.model("User", userSchema);
+const User = mongoose.model("User", userSchema);
 
 passport.use(User.createStrategy());
 
 // passport.serializeUser(User.serializeUser());
 // passport.deserializeUser(User.deserializeUser());
 
-passport.serializeUser(function(user, cb) {
-    process.nextTick(function() {
-      cb(null, { id: user.id, username: user.username, name: user.name });
-    });
+passport.serializeUser(function (user, cb) {
+  process.nextTick(function () {
+    cb(null, { id: user.id, username: user.username, name: user.name });
   });
-  
-  passport.deserializeUser(function(user, cb) {
-    process.nextTick(function() {
-      return cb(null, user);
-    });
+});
+
+passport.deserializeUser(function (user, cb) {
+  process.nextTick(function () {
+    return cb(null, user);
   });
+});
 
 passport.use(
   new GoogleStrategy(
@@ -82,7 +83,7 @@ passport.use(
       userProfileURL: "https://www.googleapis.com/oauth2/v3/userinfo",
     },
     function (accessToken, refreshToken, profile, cb) {
-      console.log(profile);
+    //   console.log(profile);
 
       User.findOrCreate({ googleId: profile.id }, function (err, user) {
         return cb(err, user);
@@ -109,6 +110,32 @@ app.get(
   }
 );
 
+app.get("/submit", (req, res) => {
+  if (req.isAuthenticated()) {
+    return res.render("submit");
+  } else {
+    res.redirect("/login");
+  }
+});
+
+app.post("/submit", (req, res) => {
+    const submittedSecret = req.body.secret;
+    
+    User.findById(req.user.id, (err, foundUser) => {
+        if(err){
+            console.log(err);
+        }
+        else{
+            if(foundUser){
+                foundUser.secret = submittedSecret;
+                foundUser.save(() => {
+                    res.redirect("/secrets");
+                })
+            }
+        }
+    })
+})
+
 app.get("/login", (req, res) => {
   return res.render("login");
 });
@@ -118,11 +145,15 @@ app.get("/register", (req, res) => {
 });
 
 app.get("/secrets", (req, res) => {
-  if (req.isAuthenticated()) {
-    return res.render("secrets");
-  } else {
-    res.redirect("/login");
-  }
+  User.find({"secret": {$ne: null}}, (err, foundUser) => {
+    if(err){
+        console.log(err);
+    } else {
+        if(foundUser){
+            res.render("secrets", {usersWithSecrets: foundUser});
+        }
+    }
+  })
 });
 
 app.get("/logout", function (req, res) {
